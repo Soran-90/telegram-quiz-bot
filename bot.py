@@ -1,6 +1,6 @@
 import json
-import asyncio
 import time
+import asyncio
 from collections import defaultdict
 
 from telegram import Update
@@ -11,24 +11,44 @@ from telegram.ext import (
     PollAnswerHandler,
 )
 
-BOT_TOKEN = "8105573215:AAH5HOerr48DVo40WZRYYBe2OIe8fdeSnK4"
+# ================= CONFIG =================
+BOT_TOKEN = "8105573215:AAH5HOerr48DVo40WZRYYBe2OIe8fdeSnK4"  # أو استخدم env
 QUIZ_TIME = 20  # seconds
+# ==========================================
 
-# تحميل الأسئلة
 with open("questions.json", "r", encoding="utf-8") as f:
     QUESTIONS = json.load(f)
 
 quiz_running = False
 current_question = 0
+
 scores = defaultdict(int)
 answer_times = defaultdict(float)
 
+# ==========================================
 
-async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    admins = await context.bot.get_chat_administrators(chat_id)
+    return any(a.user.id == user_id for a in admins)
+
+# ==========================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🤖 Quiz Bot Ready\nاكتب /quiz لبدء الاختبار")
+
+# ==========================================
+
+async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global quiz_running, current_question, scores, answer_times
 
+    if not await is_admin(update, context):
+        await update.message.reply_text("❌ الأمر مخصص للأدمن فقط")
+        return
+
     if quiz_running:
-        await update.message.reply_text("⚠️ الكوز شغال حالياً.")
+        await update.message.reply_text("⚠️ يوجد كوز شغال حالياً")
         return
 
     quiz_running = True
@@ -36,10 +56,10 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     scores.clear()
     answer_times.clear()
 
-    await update.message.reply_text("🎯 بدأ الكوز! استعدوا...")
-
+    await update.message.reply_text("🎯 بدأ الكوز!\nاستعدوا...")
     await send_question(update, context)
 
+# ==========================================
 
 async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_question, quiz_running
@@ -53,13 +73,8 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     poll_message = await context.bot.send_poll(
         chat_id=update.effective_chat.id,
-        question=f"❓ سؤال {current_question + 1}/{len(QUESTIONS)}\n\n{q['question']}",
-        options=[
-            f"A) {q['options'][0]}",
-            f"B) {q['options'][1]}",
-            f"C) {q['options'][2]}",
-            f"D) {q['options'][3]}",
-        ],
+        question=f"❓ سؤال {current_question+1}/{len(QUESTIONS)}\n\n{q['question']}",
+        options=q["options"],
         type="quiz",
         correct_option_id=q["correct_index"],
         is_anonymous=False,
@@ -67,56 +82,61 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     context.chat_data["poll_id"] = poll_message.poll.id
-    context.chat_data["start_time"] = time.time()
+    context.chat_data["poll_start"] = time.time()
 
     await asyncio.sleep(QUIZ_TIME + 1)
 
     current_question += 1
     await send_question(update, context)
 
+# ==========================================
 
-async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    answer = update.poll_answer
-    user = answer.user
+async def poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    poll_answer = update.poll_answer
+    user = poll_answer.user
+    poll_id = poll_answer.poll_id
 
-    if answer.poll_id != context.chat_data.get("poll_id"):
+    if poll_id != context.chat_data.get("poll_id"):
         return
 
-    start_time = context.chat_data.get("start_time")
-    if start_time:
-        answer_times[user.full_name] += time.time() - start_time
+    start_time = context.chat_data.get("poll_start")
+    if not start_time:
+        return
 
-    if answer.option_ids:
-        scores[user.full_name] += 1
+    elapsed = time.time() - start_time
+    answer_times[user.full_name] += elapsed
+    scores[user.full_name] += 1
 
+# ==========================================
 
 async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not scores:
-        await update.message.reply_text("❌ لم يشارك أحد.")
+        await update.message.reply_text("❌ لم يشارك أحد")
         return
 
-    sorted_users = sorted(
+    ranked = sorted(
         scores.items(),
         key=lambda x: (-x[1], answer_times[x[0]])
     )
 
-    text = "🏁 **انتهى الكوز!**\n\n🏆 **Top 10:**\n"
-    for i, (user, score) in enumerate(sorted_users[:10], start=1):
-        text += f"{i}. {user} — {score} إجابة صحيحة\n"
+    text = "🏁 **انتهى الكوز!**\n\n🏆 **أفضل 10:**\n"
+    for i, (name, score) in enumerate(ranked[:10], start=1):
+        text += f"{i}. {name} — {score} ✔️\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
+# ==========================================
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(PollAnswerHandler(poll_answer_handler))
-    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("🤖 Quiz Bot Ready")))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("quiz", quiz))
+    app.add_handler(PollAnswerHandler(poll_answer))
 
-    print("Bot is running...")
     app.run_polling()
 
+# ==========================================
 
 if __name__ == "__main__":
     main()
