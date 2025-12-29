@@ -1,11 +1,14 @@
 import json
 import asyncio
+import os
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+)
 
-# لا تضع التوكن هنا
-TOKEN = "BOT_TOKEN_FROM_ENV"
-
+# تحميل الأسئلة
 with open("questions.json", "r", encoding="utf-8") as f:
     QUESTIONS = json.load(f)
 
@@ -16,11 +19,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+
     quiz_state[chat_id] = {
         "index": 0,
         "correct": 0,
-        "total": len(QUESTIONS)
+        "total": len(QUESTIONS),
     }
+
     await send_question(chat_id, context)
 
 async def send_question(chat_id, context):
@@ -35,7 +40,7 @@ async def send_question(chat_id, context):
                 f"عدد الأسئلة: {state['total']}\n"
                 f"إجابات صحيحة: {state['correct']}\n"
                 f"النسبة: {percent}%"
-            )
+            ),
         )
         return
 
@@ -48,7 +53,7 @@ async def send_question(chat_id, context):
         type="quiz",
         correct_option_id=q["answer"],
         open_period=20,
-        is_anonymous=False
+        is_anonymous=False,
     )
 
     await asyncio.sleep(21)
@@ -56,8 +61,10 @@ async def send_question(chat_id, context):
     await send_question(chat_id, context)
 
 def main():
-    import os
     token = os.getenv("BOT_TOKEN")
+    if not token:
+        raise RuntimeError("BOT_TOKEN not set")
+
     app = ApplicationBuilder().token(token).build()
 
     app.add_handler(CommandHandler("start", start))
