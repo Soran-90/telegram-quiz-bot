@@ -1,23 +1,20 @@
-import json
 import os
-import asyncio
+import json
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
-    ContextTypes,
     CommandHandler,
     PollAnswerHandler,
+    ContextTypes,
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN not set")
 
 QUESTIONS_FILE = "questions.json"
 QUESTION_TIME = 20  # seconds
 
-# تحميل الأسئلة
 with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
     QUESTIONS = json.load(f)
 
@@ -28,7 +25,7 @@ async def start_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_sessions[chat_id] = {
         "index": 0,
         "correct": 0,
-        "total": len(QUESTIONS)
+        "total": len(QUESTIONS),
     }
     await send_question(chat_id, context)
 
@@ -42,7 +39,7 @@ async def send_question(chat_id, context):
     if idx >= len(QUESTIONS):
         await context.bot.send_message(
             chat_id=chat_id,
-            text=f"انتهى الكوز ✅\n\nإجاباتك الصحيحة: {session['correct']} / {session['total']}"
+            text=f"✅ انتهى الكويز\nإجاباتك الصحيحة: {session['correct']} / {session['total']}"
         )
         return
 
