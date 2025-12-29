@@ -12,7 +12,7 @@ from telegram.ext import (
     PollAnswerHandler,
 )
 
-BOT_TOKEN = "PUT_YOUR_TOKEN_HERE"
+BOT_TOKEN = "8105573215:AAH5HOerr48DVo40WZRYYBe2OIe8fdeSnK4"
 QUIZ_TIME = 20  # seconds
 
 # ===== تحميل الأسئلة =====
