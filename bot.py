@@ -1,6 +1,6 @@
+import os
 import json
 import asyncio
-import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
@@ -14,20 +14,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    quiz_state[chat_id] = {
-        "index": 0,
-        "total": len(QUESTIONS)
-    }
+    quiz_state[chat_id] = {"i": 0}
     await send_question(chat_id, context)
 
 async def send_question(chat_id, context):
-    state = quiz_state[chat_id]
+    i = quiz_state[chat_id]["i"]
 
-    if state["index"] >= state["total"]:
+    if i >= len(QUESTIONS):
         await context.bot.send_message(chat_id, "🏁 انتهى الاختبار")
         return
 
-    q = QUESTIONS[state["index"]]
+    q = QUESTIONS[i]
 
     await context.bot.send_poll(
         chat_id=chat_id,
@@ -40,11 +37,11 @@ async def send_question(chat_id, context):
     )
 
     await asyncio.sleep(21)
-    state["index"] += 1
+    quiz_state[chat_id]["i"] += 1
     await send_question(chat_id, context)
 
 def main():
-    token = os.getenv("BOT_TOKEN")
+    token = os.environ.get("BOT_TOKEN")
     if not token:
         raise RuntimeError("BOT_TOKEN not set")
 
